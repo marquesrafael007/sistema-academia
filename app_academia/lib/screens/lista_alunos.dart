@@ -7,7 +7,8 @@ import 'detalhes_aluno.dart';
 import 'cadastro_aluno.dart';
 
 class ListaAlunos extends StatefulWidget {
-  const ListaAlunos({super.key});
+  const ListaAlunos({super.key, this.api});
+  final ApiService? api;
 
   @override
   State<ListaAlunos> createState() => _ListaAlunosState();
@@ -15,13 +16,14 @@ class ListaAlunos extends StatefulWidget {
 
 class _ListaAlunosState extends State<ListaAlunos> {
 
-  final ApiService api = ApiService();
+  late final ApiService api;
 
   late Future<List<Aluno>> futureAlunos;
 
   @override
   void initState() {
     super.initState();
+    api = widget.api ?? ApiService();
 
     // Busca os alunos quando a tela é aberta
     futureAlunos = api.listarAlunos();
@@ -33,7 +35,8 @@ class _ListaAlunosState extends State<ListaAlunos> {
       futureAlunos = api.listarAlunos();
     });
 
-    await futureAlunos;
+    // O FutureBuilder apresenta o erro; não deixe o gesto de atualizar lançá-lo.
+    try { await futureAlunos; } catch (_) {}
   }
 
   @override
@@ -201,12 +204,17 @@ class _ListaAlunosState extends State<ListaAlunos> {
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
 
-          await Navigator.push(
+          final salvo = await Navigator.push<bool>(
             context,
             MaterialPageRoute(
-              builder: (context) => const CadastroAluno(),
+              builder: (context) => CadastroAluno(api: api),
             ),
           );
+          if (!context.mounted || salvo != true) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Aluno cadastrado com sucesso.')),
+          );
+          await atualizarLista();
 
         },
 

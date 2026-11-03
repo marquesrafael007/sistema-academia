@@ -1,8 +1,11 @@
 
 import 'package:flutter/material.dart';
+import '../models/plano.dart';
+import '../services/api_service.dart';
 
 class CadastroAluno extends StatefulWidget {
-  const CadastroAluno({super.key});
+  const CadastroAluno({super.key, this.api});
+  final ApiService? api;
 
   @override
   State<CadastroAluno> createState() => _CadastroAlunoState();
@@ -22,14 +25,30 @@ class _CadastroAlunoState extends State<CadastroAluno> {
   // Guarda o plano selecionado
   int? planoSelecionado;
 
-  // Planos temporários para desenvolver a tela
-  // Posteriormente serão carregados pela API PHP
-  final List<Map<String, dynamic>> planos = [
-    {'id': 1, 'nome': 'Plano Mensal'},
-    {'id': 2, 'nome': 'Plano Trimestral'},
-    {'id': 3, 'nome': 'Plano Anual'},
-    {'id': 4, 'nome': 'Plano Semestral'},
-  ];
+  late final ApiService api;
+  List<Plano> planos = [];
+  bool carregando = true;
+  bool salvando = false;
+  String? erroPlanos;
+
+  @override
+  void initState() {
+    super.initState();
+    api = widget.api ?? ApiService();
+    carregarPlanos();
+  }
+
+  Future<void> carregarPlanos() async {
+    setState(() { carregando = true; erroPlanos = null; });
+    try {
+      final resultado = await api.listarPlanos();
+      if (!mounted) return;
+      setState(() { planos = resultado; carregando = false; });
+    } catch (erro) {
+      if (!mounted) return;
+      setState(() { erroPlanos = erro.toString(); carregando = false; });
+    }
+  }
 
   // Libera os controladores quando a tela é fechada
   @override
@@ -42,18 +61,24 @@ class _CadastroAlunoState extends State<CadastroAluno> {
   }
 
   // Valida os campos do formulário
-  void cadastrarAluno() {
-
-    if (_formKey.currentState!.validate()) {
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Formulário validado! O envio para a API será integrado na próxima etapa.',
-          ),
-        ),
+  Future<void> cadastrarAluno() async {
+    if (salvando || !_formKey.currentState!.validate()) return;
+    setState(() { salvando = true; });
+    try {
+      await api.cadastrarAluno(
+        nome: nomeController.text.trim(),
+        idade: int.parse(idadeController.text.trim()),
+        telefone: telefoneController.text.trim(),
+        imagemUrl: imagemController.text.trim(),
+        planoId: planoSelecionado!,
       );
-
+      if (!mounted) return;
+      Navigator.pop(context, true);
+    } catch (erro) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(erro.toString())));
+    } finally {
+      if (mounted) setState(() { salvando = false; });
     }
   }
 
@@ -213,13 +238,13 @@ class _CadastroAlunoState extends State<CadastroAluno> {
                 items: planos.map((plano) {
 
                   return DropdownMenuItem<int>(
-                    value: plano['id'] as int,
-                    child: Text(plano['nome'] as String),
+                    value: plano.id,
+                    child: Text(plano.nome),
                   );
 
                 }).toList(),
 
-                onChanged: (valor) {
+                onChanged: carregando || salvando ? null : (valor) {
                   setState(() {
                     planoSelecionado = valor;
                   });
@@ -237,6 +262,13 @@ class _CadastroAlunoState extends State<CadastroAluno> {
               const SizedBox(height: 20),
 
               // CAMPO IMAGEM
+              if (carregando) const LinearProgressIndicator(),
+              if (erroPlanos != null) ...[
+                Text(erroPlanos!),
+                TextButton(onPressed: carregarPlanos, child: const Text('Tentar carregar planos novamente')),
+              ],
+              if (!carregando && erroPlanos == null && planos.isEmpty)
+                const Text('Cadastre um plano no sistema web antes de continuar.'),
               const Text(
                 'URL da imagem (opcional)',
                 style: TextStyle(fontWeight: FontWeight.bold),
@@ -262,13 +294,13 @@ class _CadastroAlunoState extends State<CadastroAluno> {
                 height: 50,
 
                 child: ElevatedButton.icon(
-                  onPressed: cadastrarAluno,
+                  onPressed: salvando || carregando || planos.isEmpty ? null : cadastrarAluno,
 
                   icon: const Icon(Icons.save),
 
-                  label: const Text(
-                    'Cadastrar Aluno',
-                    style: TextStyle(fontSize: 16),
+                  label: Text(
+                    salvando ? 'Salvando...' : 'Cadastrar Aluno',
+                    style: const TextStyle(fontSize: 16),
                   ),
                 ),
               ),

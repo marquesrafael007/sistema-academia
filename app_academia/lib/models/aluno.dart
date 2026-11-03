@@ -23,7 +23,7 @@ class Aluno {
   // Transforma o JSON recebido da API em um objeto Aluno
   factory Aluno.fromJson(Map<String, dynamic> json) {
     return Aluno(
-      id: int.parse(json['id'].toString()),
+      id: int.parse(json['id_aluno'].toString()),
       nome: json['nome'] ?? '',
       idade: int.parse(json['idade'].toString()),
       ativo: json['ativo'] == true ||
@@ -38,7 +38,7 @@ class Aluno {
   // Transforma um objeto Aluno em JSON
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
+      'id_aluno': id,
       'nome': nome,
       'idade': idade,
       'ativo': ativo,
